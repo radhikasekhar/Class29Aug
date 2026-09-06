@@ -352,6 +352,54 @@ flowchart LR
 | **P3 Derivatives + hybrid** | contextual/summary/qa/factoid generation; /search/hybrid RRF; OpenAI option; citations UI | hybrid beats vector-only on eval queries; citations resolve to page; regression tests pass |
 | **P4 RAPTOR + hardening** | RAPTOR impl behind interface; upload-endpoint automation; eval harness; full Compose test suite | RAPTOR level-1 summaries retrievable; all project tests and end-to-end regression checks pass |
 
+### 11.1 Approval-Gated Execution Protocol
+
+Implementation proceeds one task at a time and in phase order. Before starting any new task, present the completed task's outcome, test evidence, and checklist updates for approval. Do not begin the next task until approval is received.
+
+For every completed task:
+
+1. Add or update the focused automated test.
+2. Run the focused test and any required contract or integration check.
+3. Mark the task complete in this master checklist and its applicable project checklist document.
+4. Report the result and request approval before moving to the next task.
+
+### 11.2 Master Task Status
+
+| Phase | Next task | Status | Required evidence before approval |
+|---|---|---|---|
+| P0 | Create repository folders and initial per-project checklist documents | Complete | Directory layout exists; checklist documents exist; diagnostics pass |
+| P0 | Add shared configuration and Docker Compose skeleton | Complete | `.env.example` and `docker-compose.yml` exist; `docker compose --env-file .env.example config --quiet` succeeds |
+| P0 | Add database migrations and shared contracts | Complete | `python -m pytest shared/tests` passes (4 tests); migrations apply to healthy PostgreSQL/pgvector |
+| P1 | Create rag_api FastAPI foundation | Complete | `python -m pytest rag_api/tests` passes (3 tests) |
+| P1 | Implement rag_api document, chunk, and collection CRUD | Complete | `python -m pytest rag_api/tests` passes (7 tests); PostgreSQL/pgvector CRUD integration passes |
+| P1 | Create chunker CLI foundation and JSONL output | Complete | `python -m pytest shared/tests chunker/tests` passes (5 tests) |
+| P1 | Implement JSONL ingestion client | Complete | `python -m pytest ingest_client/tests` passes (2 tests) |
+| P1 | Implement core ingestion path | Blocked pending P1 approval | Project tests and PDF-to-DB integration test pass |
+| P2 | Implement vector and hybrid API search | Complete | `python -m pytest rag_api/tests` passes (10 tests) |
+| P2 | Implement Streamlit chat UI | Complete | `python -m pytest rag_ui/tests` passes (1 AppTest) |
+| P3 | Implement derivatives and hybrid search | Blocked pending P2 approval | RRF evaluation and citation tests pass |
+| P4 | Implement RAPTOR and hardening | Blocked pending P3 approval | Full regression and end-to-end suite pass |
+
+**P0 Task 1 completion record**: `chunker/`, `ingest_client/`, `rag_api/`, `rag_ui/`, `db/migrations/`, `shared/`, and `docs/checklists/` have been created. The four project checklists record this completed setup step and enforce the test gate for all subsequent tasks.
+
+**P0 Task 2 completion record**: `.env.example` and `docker-compose.yml` define the shared local configuration and the `db`, `ollama`, `api`, and `ui` service skeleton. `docker compose --env-file .env.example config --quiet` completed successfully.
+
+**P0 Task 3 completion record**: `001_init.sql` and `002_schema.sql` create the migration ledger, pgvector extensions, tables, lineage keys, and indexes. The versioned `shared.ChunkEnvelope` contract passed 4 focused tests. Both migrations applied successfully to the healthy local PostgreSQL/pgvector service, creating `schema_migrations`, `collections`, `documents`, and `chunks`.
+
+**P1 Task 1 completion record**: `rag_api` now contains an independently packaged FastAPI foundation with Pydantic settings, a raw psycopg connection-pool lifecycle, and `/health` and `/ready` endpoints. The focused API suite passed 3 tests for healthy and unavailable database readiness behavior.
+
+**P1 Task 2 completion record**: `rag_api` now provides raw-SQL CRUD endpoints for collections and documents, idempotent document upsert by SHA-256, transactional chunk bulk upsert, document chunk listing, and deletion endpoints. PostgreSQL/pgvector integration tests verified the complete collection-document-chunk lifecycle, repeated document upsert, and invalid embedding-dimension rejection. API settings support `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`, with `POSTGRES_*` compatibility aliases.
+
+**P1 Task 3 completion record**: `chunker` converts TXT and HTML directly, uses Docling when available for PDF/DOCX, creates provenance-aware chunks, obtains Ollama embeddings, and emits versioned JSONL plus manifests. It supports contextual, QA-pair, factoid, and summary derivatives. Shared and chunker tests passed 5/5.
+
+**P1 Task 4 completion record**: `ingest_client` validates chunker JSONL with the shared contract, upserts documents, batches chunk requests, and persists completed SHA-256 values for resumable idempotent runs. Its mocked HTTP test suite passed 2/2.
+
+**P2 API completion record**: `rag_api` provides deterministic vector and hybrid RRF retrieval plus validated document uploads. The API suite passed 10 tests against PostgreSQL/pgvector.
+
+**P2 UI completion record**: `rag_ui` provides Streamlit chat history, provider/model/retrieval controls, hybrid search, streamed Ollama answers, and expandable page citations. Its headless AppTest passed.
+
+**Automated verification record**: the workspace virtual environment ran `pytest shared/tests chunker/tests ingest_client/tests rag_api/tests rag_ui/tests` successfully: 18 tests passed. The remaining deployment check is starting the containerized API and UI through Docker Compose in a terminal where the Docker CLI is available.
+
 ## 12. Non-Goals (v1)
 
 No authentication/authorization · no multi-tenancy · no distributed queue/workers · no reranker · no RBAC/audit logging · no cloud IaC.

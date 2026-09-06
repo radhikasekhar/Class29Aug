@@ -1,0 +1,1 @@
+"""JSONL outbox ingestion client."""
